@@ -139,28 +139,22 @@
 	});
 
 	on("change:adventuring_grade", function(eventInfo) {
-		const previous_grade = eventInfo.previousValue == undefined ? copper_rank : eventInfo.previousValue;
 		const new_grade = eventInfo.newValue;
-		const previous_grade_value = previous_grade == platinum_rank ? 3 : previous_grade == gold_rank ? 3 : previous_grade == silver_rank ? 2 : 1;
 		const new_grade_value = new_grade == platinum_rank ? 3 : new_grade == gold_rank ? 3 : new_grade == silver_rank ? 2 : 1;
-
-		if (previous_grade_value == new_grade_value)
-			return;
 
 		getAttrs(["minor_action", "downgrade_level"], function(v) {
 			var output = {};
 
 			const downgrade = v["downgrade_level"];
 
-			const minor_action = parseInt(v["minor_action"]);
-			var new_minor_action = minor_action + new_grade_value - previous_grade_value;
+			var minor_action = new_grade_value;
 
 			if (downgrade == copper_rank)
-				new_minor_action = Math.min(new_minor_action, 1);
+				minor_action = Math.min(minor_action, 1);
 			else if (downgrade == silver_rank && new_grade_value != copper_rank)
-				new_minor_action = Math.min(new_minor_action, 2);
+				minor_action = Math.min(minor_action, 2);
 
-			output["minor_action"] = new_minor_action;
+			output["minor_action"] = minor_action;
 
 			setAttrs(output, {silent: true});
 		});
@@ -176,6 +170,7 @@
 			const capped_level = character_level > 12 ? 12 : character_level;
 
 			const grade = character_level == 89 ? platinum_rank : character_level > 8 ? gold_rank : character_level > 4 ? silver_rank : copper_rank;
+			const grade_ranked = Math.floor((capped_level) / 4);
 
 			var new_grade = grade;
 			if (downgrade == copper_rank)
@@ -183,9 +178,7 @@
 			else if (downgrade == silver_rank && grade != copper_rank)
 				new_grade = silver_rank;
 
-			var new_grade_rank = new_grade == platinum_rank ? 3 : new_grade == gold_rank ? 3 : new_grade == silver_rank ? 2 : 1;
-
-			var mastery_bonus = 2 + new_grade_rank;
+			var mastery_bonus = 2 + grade_ranked;
 			if (downgrade == copper_rank)
 				mastery_bonus = 3;
 			else if (downgrade == silver_rank && grade != copper_rank)
@@ -675,32 +668,32 @@
 	});
 
 	on("change:empathy change:mastery_bonus", function(eventInfo) {
-		getAttrs(["empathy", "mastery_bonus", "psychology", "psychology_bns", "artistry", "artistry_bns", "charm", "charm_bns"], function(v) {
+		getAttrs(["empathy", "mastery_bonus", "psychology", "psychology_bns", "artistry", "artistry_bns", "appeal", "appeal_bns"], function(v) {
 			var output = {};
 
 			const empathy = parseInt(v["empathy"]);
 
 			const psychology = v["psychology"] == "on";
 			const artistry = v["artistry"] == "on";
-			const charm = v["charm"] == "on";
+			const appeal = v["appeal"] == "on";
 
 			const psychology_bns = parseInt(v["psychology_bns"]);
 			const artistry_bns = parseInt(v["artistry_bns"]);
-			const charm_bns = parseInt(v["charm_bns"]);
+			const appeal_bns = parseInt(v["appeal_bns"]);
 
 			const mastery_bonus = parseInt(v["mastery_bonus"]);
 
 			const psychology_total = empathy + (psychology ? mastery_bonus : 0) + psychology_bns;
 			const artistry_total = empathy + (artistry ? mastery_bonus : 0) + artistry_bns;
-			const charm_total = empathy + (charm ? mastery_bonus : 0) + charm_bns;
+			const appeal_total = empathy + (appeal ? mastery_bonus : 0) + appeal_bns;
 
 			output["psychology_mastery"] = psychology ? mastery_bonus : 0;
 			output["artistry_mastery"] = artistry ? mastery_bonus : 0;
-			output["charm_mastery"] = charm ? mastery_bonus : 0;
+			output["appeal_mastery"] = appeal ? mastery_bonus : 0;
 
 			output["psychology_total_label"] = `+${psychology_total}`;
 			output["artistry_total_label"] = `+${artistry_total}`;
-			output["charm_total_label"] = `+${charm_total}`;
+			output["appeal_total_label"] = `+${appeal_total}`;
 
 			setAttrs(output, {silent: true});
 		});
@@ -746,21 +739,21 @@
 		});
 	});
 
-	on("change:charm change:charm_bns", function(eventInfo) {
-		getAttrs(["empathy", "mastery_bonus", "charm", "charm_bns"], function(v) {
+	on("change:appeal change:appeal_bns", function(eventInfo) {
+		getAttrs(["empathy", "mastery_bonus", "appeal", "appeal_bns"], function(v) {
 			var output = {};
 
 			const empathy = parseInt(v["empathy"]);
 
-			const charm = v["charm"] == "on";
-			const charm_bns = parseInt(v["charm_bns"]);
+			const appeal = v["appeal"] == "on";
+			const appeal_bns = parseInt(v["appeal_bns"]);
 
 			const mastery_bonus = parseInt(v["mastery_bonus"]);
 
-			const charm_total = empathy + (charm ? mastery_bonus : 0) + charm_bns;
+			const appeal_total = empathy + (appeal ? mastery_bonus : 0) + appeal_bns;
 
-			output["charm_mastery"] = charm ? mastery_bonus : 0;
-			output["charm_total_label"] = `+${charm_total}`;
+			output["appeal_mastery"] = appeal ? mastery_bonus : 0;
+			output["appeal_total_label"] = `+${appeal_total}`;
 
 			setAttrs(output, {silent: true});
 		});
@@ -1075,7 +1068,7 @@
 						const featureName = v[`repeating_features_${id}_feature_name`];
 						const featureLevel = v[`repeating_features_${id}_feature_level`];
 
-						if (primary_class == undefined || primary_class == "" || secondary_class == undefined || secondary_class == "") {
+						if ((primary_class == undefined || primary_class == "") && (secondary_class == undefined || secondary_class == "")) {
 							uncategorized_features.push({
 								feature_discipline: featureDiscipline,
 								feature_class: featureClass,
@@ -1159,13 +1152,17 @@
 
 					var final_string = "";
 					if (primary_features.length > 0) {
-						final_string += `Primary Class (${primary_features[0].feature_discipline} ${primary_features[0].feature_class}) features\n`;
+						const primary_discipline = primary_features.find(feature => feature.feature_discipline !== undefined && feature.feature_discipline !== null && feature.feature_discipline !== "")?.feature_discipline || "";
+						const primary_class = primary_features.find(feature => feature.feature_class !== undefined && feature.feature_class !== null && feature.feature_class !== "")?.feature_class || "";
+						final_string += `Primary Class (${primary_discipline} ${primary_class}) features\n`;
 						for (let feature of primary_features) {
 							final_string += `  ${feature.feature_name} (Rank ${feature.feature_level})\n`;
 						}
 					}
 					if (secondary_features.length > 0 && adventuring_grade != copper_rank) {
-						final_string += `Secondary Class (${secondary_features[0].feature_discipline} ${secondary_features[0].feature_class}) features\n`;
+						const secondary_discipline = secondary_features.find(feature => feature.feature_discipline !== undefined && feature.feature_discipline !== null && feature.feature_discipline !== "")?.feature_discipline || "";
+						const secondary_class = secondary_features.find(feature => feature.feature_class !== undefined && feature.feature_class !== null && feature.feature_class !== "")?.feature_class || "";
+						final_string += `Secondary Class (${secondary_discipline} ${secondary_class}) features\n`;
 						for (let feature of secondary_features) {
 							final_string += `  ${feature.feature_name} (Rank ${feature.feature_level})\n`;
 						}
@@ -1360,6 +1357,49 @@
 
 			setAttrs(output, {silent: true});
 		});
+	});
+
+	on("change:repeating_attacks", function(eventInfo) {
+		const id = eventInfo.triggerName;
+		if (eventInfo["sourceAttribute"].includes("attack_rank")) {
+			const new_rank = eventInfo["newValue"];
+			var attrs_to_get = [`${id}_attack_damage_${new_rank}`, `${id}_attack_description_${new_rank}`, `${id}_attack_damage`, `${id}_attack_description`];
+			getAttrs(attrs_to_get, function(v) {
+				var output = {};
+
+				var new_damage = v[`${id}_attack_damage_${new_rank}`];
+				var new_description = v[`${id}_attack_description_${new_rank}`];
+
+				if (new_damage == undefined || new_damage == "") {
+					new_damage = v[`${id}_attack_damage`];
+					output[`${id}_attack_damage_${new_rank}`] = new_damage;
+				}
+				if (new_description == undefined || new_description == "") {
+					new_description = v[`${id}_attack_description`];
+					output[`${id}_attack_description_${new_rank}`] = new_description;
+				}
+
+				output[`${id}_attack_damage`] = new_damage;
+				output[`${id}_attack_description`] = new_description;
+
+				setAttrs(output, {silent: true});
+			});
+		}
+		else {
+			var attrs_to_get = [`${id}_attack_rank`, `${id}_attack_damage`, `${id}_attack_description`];
+			getAttrs(attrs_to_get, function(v) {
+				var output = {};
+
+				const rank = v[`${id}_attack_rank`];
+				const damage = v[`${id}_attack_damage`];
+				const description = v[`${id}_attack_description`];
+
+				output[`${id}_attack_damage_${rank}`] = damage;
+				output[`${id}_attack_description_${rank}`] = description;
+
+				setAttrs(output, {silent: true});
+			});
+		}
 	});
 
 	on("change:mastery_bonus", function(eventInfo) {
@@ -1865,7 +1905,7 @@
 							<!-- Text area for quirk description -->
 							<input type="hidden" name="attr_quirk_fold" class="sheet-folder" />
 							<div class="sheet-foldable">
-								<textarea name="attr_quirk_description" style="width: 100%;" title="Quirk deception" placeholder="Quirk deception"></textarea>
+								<textarea name="attr_quirk_description" style="width: 100%;" title="Quirk description" placeholder="Quirk description"></textarea>
 							</div>
 						</div>
 					</fieldset>
@@ -2092,7 +2132,7 @@
 					<div class="sheet-abilityBlock">
 						<div class="sheet-statBlock">
 							<input type="number" name="attr_strength" value="0" />
-							<button type="roll" name="act_rollStrength" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Strength}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{strength} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} +?{Modifier|0}]]}}">
+							<button type="roll" name="act_rollStrength" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Strength}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{strength} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} @{ask_modifier}]]}}">
 								<span>Strength</span>
 							</button>
 						</div>
@@ -2104,7 +2144,7 @@
 								<span>Brute</span>
 								<input type="number" name="attr_brute_bns" value="0" />
 								<input type="hidden" name="attr_brute_total_label" value="0" />
-								<button type="roll" name="act_rollBrute" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Brute}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{strength} +@{brute_mastery} +@{brute_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} +@{brute_mastery} +@{brute_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} +@{brute_mastery} +@{brute_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollBrute" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Brute}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{strength} +@{brute_mastery} +@{brute_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} +@{brute_mastery} +@{brute_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} +@{brute_mastery} +@{brute_bns} @{ask_modifier}]]}}">
 									<span name="attr_brute_total_label"></span>
 								</button>
 							</div>
@@ -2115,7 +2155,7 @@
 								<span>Endurance</span>
 								<input type="number" name="attr_endurance_bns" value="0" />
 								<input type="hidden" name="attr_endurance_total_label" value="0" />
-								<button type="roll" name="act_rollEndurance" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Endurance}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{strength} +@{endurance_mastery} +@{endurance_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} +@{endurance_mastery} +@{endurance_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} +@{endurance_mastery} +@{endurance_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollEndurance" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Endurance}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{strength} +@{endurance_mastery} +@{endurance_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} +@{endurance_mastery} +@{endurance_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} +@{endurance_mastery} +@{endurance_bns} @{ask_modifier}]]}}">
 									<span name="attr_endurance_total_label"></span>
 								</button>
 							</div>
@@ -2126,7 +2166,7 @@
 								<span>Intimidation</span>
 								<input type="number" name="attr_intimidation_bns" value="0" />
 								<input type="hidden" name="attr_intimidation_total_label" value="0" />
-								<button type="roll" name="act_rollIntimidation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Intimidation}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{strength} +@{intimidation_mastery} +@{intimidation_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} +@{intimidation_mastery} +@{intimidation_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} +@{intimidation_mastery} +@{intimidation_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollIntimidation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Intimidation}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{strength} +@{intimidation_mastery} +@{intimidation_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{strength} +@{intimidation_mastery} +@{intimidation_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{strength} +@{intimidation_mastery} +@{intimidation_bns} @{ask_modifier}]]}}">
 									<span name="attr_intimidation_total_label"></span>
 								</button>
 							</div>
@@ -2136,7 +2176,7 @@
 					<div class="sheet-abilityBlock">
 						<div class="sheet-statBlock">
 							<input type="number" name="attr_agility" value="0" />
-							<button type="roll" name="act_rollAgility" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Agility}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{agility} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} +?{Modifier|0}]]}}">
+							<button type="roll" name="act_rollAgility" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Agility}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{agility} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} @{ask_modifier}]]}}">
 								<span>Agility</span>
 							</button>
 						</div>
@@ -2148,7 +2188,7 @@
 								<span>Sports</span>
 								<input type="number" name="attr_sports_bns" value="0" />
 								<input type="hidden" name="attr_sports_total_label" value="0" />
-								<button type="roll" name="act_rollSports" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Sports}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{agility} +@{sports_mastery} +@{sports_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} +@{sports_mastery} +@{sports_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} +@{sports_mastery} +@{sports_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollSports" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Sports}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{agility} +@{sports_mastery} +@{sports_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} +@{sports_mastery} +@{sports_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} +@{sports_mastery} +@{sports_bns} @{ask_modifier}]]}}">
 									<span name="attr_sports_total_label"></span>
 								</button>
 							</div>
@@ -2159,7 +2199,7 @@
 								<span>Thievery</span>
 								<input type="number" name="attr_thievery_bns" value="0" />
 								<input type="hidden" name="attr_thievery_total_label" value="0" />
-								<button type="roll" name="act_rollThievery" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Thievery}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{agility} +@{thievery_mastery} +@{thievery_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} +@{thievery_mastery} +@{thievery_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} +@{thievery_mastery} +@{thievery_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollThievery" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Thievery}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{agility} +@{thievery_mastery} +@{thievery_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} +@{thievery_mastery} +@{thievery_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} +@{thievery_mastery} +@{thievery_bns} @{ask_modifier}]]}}">
 									<span name="attr_thievery_total_label"></span>
 								</button>
 							</div>
@@ -2170,7 +2210,7 @@
 								<span>Deception</span>
 								<input type="number" name="attr_deception_bns" value="0" />
 								<input type="hidden" name="attr_deception_total_label" value="0" />
-								<button type="roll" name="act_rollDeception" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Deception}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{agility} +@{deception_mastery} +@{deception_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} +@{deception_mastery} +@{deception_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} +@{deception_mastery} +@{deception_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollDeception" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Deception}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{agility} +@{deception_mastery} +@{deception_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{agility} +@{deception_mastery} +@{deception_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{agility} +@{deception_mastery} +@{deception_bns} @{ask_modifier}]]}}">
 									<span name="attr_deception_total_label"></span>
 								</button>
 							</div>
@@ -2180,7 +2220,7 @@
 					<div class="sheet-abilityBlock">
 						<div class="sheet-statBlock">
 							<input type="number" name="attr_awareness" value="0" />
-							<button type="roll" name="act_rollAwareness" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Awareness}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{awareness} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} +?{Modifier|0}]]}}">
+							<button type="roll" name="act_rollAwareness" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Awareness}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{awareness} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} @{ask_modifier}]]}}">
 								<span>Awareness</span>
 							</button>
 						</div>
@@ -2192,7 +2232,7 @@
 								<span>Detect</span>
 								<input type="number" name="attr_detect_bns" value="0" />
 								<input type="hidden" name="attr_detect_total_label" value="0" />
-								<button type="roll" name="act_rollDetect" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Detect}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{awareness} +@{detect_mastery} +@{detect_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} +@{detect_mastery} +@{detect_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} +@{detect_mastery} +@{detect_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollDetect" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Detect}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{awareness} +@{detect_mastery} +@{detect_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} +@{detect_mastery} +@{detect_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} +@{detect_mastery} +@{detect_bns} @{ask_modifier}]]}}">
 									<span name="attr_detect_total_label"></span>
 								</button>
 							</div>
@@ -2203,7 +2243,7 @@
 								<span>Information</span>
 								<input type="number" name="attr_information_bns" value="0" />
 								<input type="hidden" name="attr_information_total_label" value="0" />
-								<button type="roll" name="act_rollInformation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Information}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{awareness} +@{information_mastery} +@{information_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} +@{information_mastery} +@{information_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} +@{information_mastery} +@{information_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollInformation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Information}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{awareness} +@{information_mastery} +@{information_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} +@{information_mastery} +@{information_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} +@{information_mastery} +@{information_bns} @{ask_modifier}]]}}">
 									<span name="attr_information_total_label"></span>
 								</button>
 							</div>
@@ -2214,7 +2254,7 @@
 								<span>Reason</span>
 								<input type="number" name="attr_reason_bns" value="0" />
 								<input type="hidden" name="attr_reason_total_label" value="0" />
-								<button type="roll" name="act_rollReason" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Reason}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{awareness} +@{reason_mastery} +@{reason_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} +@{reason_mastery} +@{reason_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} +@{reason_mastery} +@{reason_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollReason" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Reason}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{awareness} +@{reason_mastery} +@{reason_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{awareness} +@{reason_mastery} +@{reason_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{awareness} +@{reason_mastery} +@{reason_bns} @{ask_modifier}]]}}">
 									<span name="attr_reason_total_label"></span>
 								</button>
 							</div>
@@ -2224,7 +2264,7 @@
 					<div class="sheet-abilityBlock">
 						<div class="sheet-statBlock">
 							<input type="number" name="attr_empathy" value="0" />
-							<button type="roll" name="act_rollEmpathy" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Empathy}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{empathy} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} +?{Modifier|0}]]}}">
+							<button type="roll" name="act_rollEmpathy" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Empathy}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{empathy} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} @{ask_modifier}]]}}">
 								<span>Empathy</span>
 							</button>
 						</div>
@@ -2236,7 +2276,7 @@
 								<span>Psychology</span>
 								<input type="number" name="attr_psychology_bns" value="0" />
 								<input type="hidden" name="attr_psychology_total_label" value="0" />
-								<button type="roll" name="act_rollPsychology" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Psychology}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{empathy} +@{psychology_mastery} +@{psychology_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} +@{psychology_mastery} +@{psychology_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} +@{psychology_mastery} +@{psychology_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollPsychology" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Psychology}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{empathy} +@{psychology_mastery} +@{psychology_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} +@{psychology_mastery} +@{psychology_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} +@{psychology_mastery} +@{psychology_bns} @{ask_modifier}]]}}">
 									<span name="attr_psychology_total_label"></span>
 								</button>
 							</div>
@@ -2247,19 +2287,19 @@
 								<span>Artistry</span>
 								<input type="number" name="attr_artistry_bns" value="0" />
 								<input type="hidden" name="attr_artistry_total_label" value="0" />
-								<button type="roll" name="act_rollArtistry" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Artistry}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{empathy} +@{artistry_mastery} +@{artistry_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} +@{artistry_mastery} +@{artistry_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} +@{artistry_mastery} +@{artistry_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollArtistry" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Artistry}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{empathy} +@{artistry_mastery} +@{artistry_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} +@{artistry_mastery} +@{artistry_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} +@{artistry_mastery} +@{artistry_bns} @{ask_modifier}]]}}">
 									<span name="attr_artistry_total_label"></span>
 								</button>
 							</div>
 							<div class="sheet-compLine">
 								<span>+</span>
-								<input type="checkbox" name="attr_charm" />
-								<input type="hidden" name="attr_charm_bns" value="0" />
-								<span>Charm</span>
-								<input type="number" name="attr_charm_bns" value="0" />
-								<input type="hidden" name="attr_charm_total_label" value="0" />
-								<button type="roll" name="act_rollCharm" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Charm}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{empathy} +@{charm_mastery} +@{charm_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} +@{charm_mastery} +@{charm_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} +@{charm_mastery} +@{charm_bns} +?{Modifier|0}]]}}">
-									<span name="attr_charm_total_label"></span>
+								<input type="checkbox" name="attr_appeal" />
+								<input type="hidden" name="attr_appeal_bns" value="0" />
+								<span>Appeal</span>
+								<input type="number" name="attr_appeal_bns" value="0" />
+								<input type="hidden" name="attr_appeal_total_label" value="0" />
+								<button type="roll" name="act_rollAppeal" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Appeal}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{empathy} +@{appeal_mastery} +@{appeal_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{empathy} +@{appeal_mastery} +@{appeal_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{empathy} +@{appeal_mastery} +@{appeal_bns} @{ask_modifier}]]}}">
+									<span name="attr_appeal_total_label"></span>
 								</button>
 							</div>
 						</div>
@@ -2297,7 +2337,7 @@
 						<input type="hidden" name="attr_arcanist_mastery" value="0" />
 						<input type="number" name="attr_arcanist_bns" value="0" />
 						<input type="hidden" name="attr_arcanist_total_label" value="+0" />
-						<button type="roll" name="act_rollArcanist" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Arcanist kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{arcanist_quality} +@{arcanist_mastery} +@{arcanist_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{arcanist_quality} +@{arcanist_mastery} +@{arcanist_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{arcanist_quality} +@{arcanist_mastery} +@{arcanist_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollArcanist" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Arcanist kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{arcanist_quality} +@{arcanist_mastery} +@{arcanist_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{arcanist_quality} +@{arcanist_mastery} +@{arcanist_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{arcanist_quality} +@{arcanist_mastery} +@{arcanist_bns} @{ask_modifier}]]}}">
 							<span name="attr_arcanist_total_label"></span>
 						</button>
 					</div>
@@ -2310,7 +2350,7 @@
 						<input type="hidden" name="attr_chemist_mastery" value="0" />
 						<input type="number" name="attr_chemist_bns" value="0" />
 						<input type="hidden" name="attr_chemist_total_label" value="+0" />
-						<button type="roll" name="act_rollChemist" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Chemist kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{chemist_quality} +@{chemist_mastery} +@{chemist_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{chemist_quality} +@{chemist_mastery} +@{chemist_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{chemist_quality} +@{chemist_mastery} +@{chemist_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollChemist" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Chemist kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{chemist_quality} +@{chemist_mastery} +@{chemist_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{chemist_quality} +@{chemist_mastery} +@{chemist_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{chemist_quality} +@{chemist_mastery} +@{chemist_bns} @{ask_modifier}]]}}">
 							<span name="attr_chemist_total_label"></span>
 						</button>
 					</div>
@@ -2323,7 +2363,7 @@
 						<input type="hidden" name="attr_climbing_mastery" value="0" />
 						<input type="number" name="attr_climbing_bns" value="0" />
 						<input type="hidden" name="attr_climbing_total_label" value="+0" />
-						<button type="roll" name="act_rollClimbing" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Climbing kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{climbing_quality} +@{climbing_mastery} +@{climbing_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{climbing_quality} +@{climbing_mastery} +@{climbing_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{climbing_quality} +@{climbing_mastery} +@{climbing_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollClimbing" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Climbing kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{climbing_quality} +@{climbing_mastery} +@{climbing_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{climbing_quality} +@{climbing_mastery} +@{climbing_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{climbing_quality} +@{climbing_mastery} +@{climbing_bns} @{ask_modifier}]]}}">
 							<span name="attr_climbing_total_label"></span>
 						</button>
 					</div>
@@ -2336,7 +2376,7 @@
 						<input type="hidden" name="attr_impersonation_mastery" value="0" />
 						<input type="number" name="attr_impersonation_bns" value="0" />
 						<input type="hidden" name="attr_impersonation_total_label" value="+0" />
-						<button type="roll" name="act_rollImpersonation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Impersonation kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{impersonation_quality} +@{impersonation_mastery} +@{impersonation_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{impersonation_quality} +@{impersonation_mastery} +@{impersonation_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{impersonation_quality} +@{impersonation_mastery} +@{impersonation_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollImpersonation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Impersonation kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{impersonation_quality} +@{impersonation_mastery} +@{impersonation_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{impersonation_quality} +@{impersonation_mastery} +@{impersonation_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{impersonation_quality} +@{impersonation_mastery} +@{impersonation_bns} @{ask_modifier}]]}}">
 							<span name="attr_impersonation_total_label"></span>
 						</button>
 					</div>
@@ -2349,7 +2389,7 @@
 						<input type="hidden" name="attr_infiltration_mastery" value="0" />
 						<input type="number" name="attr_infiltration_bns" value="0" />
 						<input type="hidden" name="attr_infiltration_total_label" value="+0" />
-						<button type="roll" name="act_rollInfiltration" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Infiltration kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{infiltration_quality} +@{infiltration_mastery} +@{infiltration_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{infiltration_quality} +@{infiltration_mastery} +@{infiltration_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{infiltration_quality} +@{infiltration_mastery} +@{infiltration_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollInfiltration" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Infiltration kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{infiltration_quality} +@{infiltration_mastery} +@{infiltration_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{infiltration_quality} +@{infiltration_mastery} +@{infiltration_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{infiltration_quality} +@{infiltration_mastery} +@{infiltration_bns} @{ask_modifier}]]}}">
 							<span name="attr_infiltration_total_label"></span>
 						</button>
 					</div>
@@ -2362,7 +2402,7 @@
 						<input type="hidden" name="attr_mechanic_mastery" value="0" />
 						<input type="number" name="attr_mechanic_bns" value="0" />
 						<input type="hidden" name="attr_mechanic_total_label" value="+0" />
-						<button type="roll" name="act_rollMechanic" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Mechanic kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{mechanic_quality} +@{mechanic_mastery} +@{mechanic_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{mechanic_quality} +@{mechanic_mastery} +@{mechanic_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{mechanic_quality} +@{mechanic_mastery} +@{mechanic_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollMechanic" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Mechanic kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{mechanic_quality} +@{mechanic_mastery} +@{mechanic_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{mechanic_quality} +@{mechanic_mastery} +@{mechanic_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{mechanic_quality} +@{mechanic_mastery} +@{mechanic_bns} @{ask_modifier}]]}}">
 							<span name="attr_mechanic_total_label"></span>
 						</button>
 					</div>
@@ -2375,7 +2415,7 @@
 						<input type="hidden" name="attr_navigation_mastery" value="0" />
 						<input type="number" name="attr_navigation_bns" value="0" />
 						<input type="hidden" name="attr_navigation_total_label" value="+0" />
-						<button type="roll" name="act_rollNavigation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Navigation kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{navigation_quality} +@{navigation_mastery} +@{navigation_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{navigation_quality} +@{navigation_mastery} +@{navigation_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{navigation_quality} +@{navigation_mastery} +@{navigation_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollNavigation" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Navigation kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{navigation_quality} +@{navigation_mastery} +@{navigation_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{navigation_quality} +@{navigation_mastery} +@{navigation_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{navigation_quality} +@{navigation_mastery} +@{navigation_bns} @{ask_modifier}]]}}">
 							<span name="attr_navigation_total_label"></span>
 						</button>
 					</div>
@@ -2388,7 +2428,7 @@
 						<input type="hidden" name="attr_thaumaturgist_mastery" value="0" />
 						<input type="number" name="attr_thaumaturgist_bns" value="0" />
 						<input type="hidden" name="attr_thaumaturgist_total_label" value="+0" />
-						<button type="roll" name="act_rollThaumaturgist" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Thaumaturgist kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{thaumaturgist_quality} +@{thaumaturgist_mastery} +@{thaumaturgist_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{thaumaturgist_quality} +@{thaumaturgist_mastery} +@{thaumaturgist_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{thaumaturgist_quality} +@{thaumaturgist_mastery} +@{thaumaturgist_bns} +?{Modifier|0}]]}}">
+						<button type="roll" name="act_rollThaumaturgist" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=Thaumaturgist kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{thaumaturgist_quality} +@{thaumaturgist_mastery} +@{thaumaturgist_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{thaumaturgist_quality} +@{thaumaturgist_mastery} +@{thaumaturgist_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{thaumaturgist_quality} +@{thaumaturgist_mastery} +@{thaumaturgist_bns} @{ask_modifier}]]}}">
 							<span name="attr_thaumaturgist_total_label"></span>
 						</button>
 					</div>
@@ -2403,7 +2443,7 @@
 								<input type="hidden" name="attr_toolkit_mastery" value="0" />
 								<input type="number" name="attr_toolkit_bns" value="0" />
 								<input type="hidden" name="attr_toolkit_total_label" value="+0" />
-								<button type="roll" name="act_rollToolkit" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=@{toolkit_name} kit}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{toolkit_quality} +@{toolkit_mastery} +@{toolkit_bns} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{toolkit_quality} +@{toolkit_mastery} +@{toolkit_bns} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{toolkit_quality} +@{toolkit_mastery} +@{toolkit_bns} +?{Modifier|0}]]}}">
+								<button type="roll" name="act_rollToolkit" value="@{roll_whisper_type} &{template:generic} {{charName=@{character_name}}} {{rollName=@{toolkit_name} kit}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{toolkit_quality} +@{toolkit_mastery} +@{toolkit_bns} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{toolkit_quality} +@{toolkit_mastery} +@{toolkit_bns} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{toolkit_quality} +@{toolkit_mastery} +@{toolkit_bns} @{ask_modifier}]]}}">
 									<span name="attr_toolkit_total_label"></span>
 								</button>
 							</div>
@@ -3024,7 +3064,7 @@
 							<div style="gap: 4px;">
 								<div>
 									<input type="hidden" name="attr_attack_roll" value="+0" />
-									<button type="roll" name="act_rollAttack" value="@{roll_whisper_type} &{template:attack} {{charName=@{character_name}}} {{rollName=@{attack_name}}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{attack_mastery_value} +@{attack_bonus} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{attack_mastery_value} +@{attack_bonus} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{attack_mastery_value} +@{attack_bonus} +?{Modifier|0}]]}} {{damage=@{attack_damage}}}"><span name="attr_attack_roll"></span></button>
+									<button type="roll" name="act_rollAttack" value="@{roll_whisper_type} &{template:attack} {{charName=@{character_name}}} {{rollName=@{attack_name}}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{attack_mastery_value} +@{attack_bonus} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{attack_mastery_value} +@{attack_bonus} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{attack_mastery_value} +@{attack_bonus} @{ask_modifier}]]}} {{damage=@{attack_damage}}}"><span name="attr_attack_roll"></span></button>
 									<input type="checkbox" name="attr_attack_mastery" title="Attack mastery" value="on" checked />
 									<input type="hidden" name="attr_attack_mastery_value" />
 									<input type="text" name="attr_attack_name" title="Attack name" placeholder="Attack name" />
@@ -3382,7 +3422,7 @@
 									<div>
 										<div>
 											<input type="hidden" name="attr_attack_roll" value="+0" />
-											<button type="roll" name="act_rollAttack" value="@{roll_whisper_type} &{template:attack} {{charName=@{character_name}}} {{rollName=@{attack_name}}} {{RollType=[[?{Roll Type|Normal,0|Edge,1|Setback,2}]]}} {{totalN=[[2d6 +@{attack_mastery_value} +@{attack_bonus} +?{Modifier|0}]]}} {{totalE=[[{2d6,2d6}kh1 +@{attack_mastery_value} +@{attack_bonus} +?{Modifier|0}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{attack_mastery_value} +@{attack_bonus} +?{Modifier|0}]]}} {{damage=@{attack_damage}}}"><span name="attr_attack_roll"></span></button>
+											<button type="roll" name="act_rollAttack" value="@{roll_whisper_type} &{template:attack} {{charName=@{character_name}}} {{rollName=@{attack_name}}} {{RollType=[[@{ask_advantage}]]}} {{totalN=[[2d6 +@{attack_mastery_value} +@{attack_bonus} @{ask_modifier}]]}} {{totalE=[[{2d6,2d6}kh1 +@{attack_mastery_value} +@{attack_bonus} @{ask_modifier}]]}} {{totalSB=[[{2d6,2d6}kl1 +@{attack_mastery_value} +@{attack_bonus} @{ask_modifier}]]}} {{damage=@{attack_damage}}}"><span name="attr_attack_roll"></span></button>
 											<input type="checkbox" name="attr_attack_mastery" title="Attack mastery" value="on" checked />
 											<input type="hidden" name="attr_attack_mastery_value" />
 											<input type="text" name="attr_attack_name" title="Attack name" placeholder="Attack name" />
@@ -3392,13 +3432,19 @@
 											<input type="number" name="attr_attack_bonus" title="Attack bonus" value="0" />
 										</div>
 										<div>
-											<input type="text" name="attr_attack_damage" title="Attack damage" value=" 1 HP Blunt Unarmed Combat" />
+											<input type="text" name="attr_attack_damage" title="Attack damage" value="1 HP Blunt Unarmed Combat" />
 											<input type="checkbox" name="attr_attack_fold" class="sheet-folder" value="on" checked />
 											<span class="sheet-folder"></span>
 										</div>
 									</div>
 									<input type="hidden" name="attr_attack_fold" class="sheet-folder" value="on" />
 									<div class="sheet-foldable">
+										<select name="attr_attack_rank" value="none">
+											<option value="none" selected>None</option>
+											<option value="copper">Rank 1</option>
+											<option value="silver">Rank 2</option>
+											<option value="gold">Rank 3</option>
+										</select>
 										<textarea name="attr_attack_description" title="Attack description" placeholder="Attack description"></textarea>
 									</div>
 								</div>
@@ -4522,6 +4568,28 @@ Fond memories: 0/50" />
 		<h1>Options</h1>
 
 		<div>
+			<div>
+				<div class="sheet-sectionTitle">
+					<span class="sheet-sectionTitle">Roll options</span>
+				</div>
+				<div class="sheet-sectionContainer">
+					<div>
+						<span>Ask for modifier</span>
+						<select name="attr_ask_modifier">
+							<option value="+?{Modifier|0}" selected>Always</option>
+							<option value="+0">Never</option>
+						</select>
+					</div>
+					<div>
+						<span>Ask for edge/setback</span>
+						<select name="attr_ask_advantage">
+							<option value="?{Roll Type|Normal,0|Edge,1|Setback,2}" selected>Always</option>
+							<option value="0">Never</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
 			<div>
 				<div class="sheet-sectionTitle">
 					<span class="sheet-sectionTitle">Downgrading</span>
